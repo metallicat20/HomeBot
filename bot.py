@@ -3,7 +3,7 @@ import telebot
 import re
 from kodi import update_library, clean_library
 from screenshot import get_screenshot
-from uTorrent_Client.app.utorrentapi import UTorrentAPI, TorrentInfo, TorrentListInfo
+from utorrentapi import UTorrentAPI, TorrentInfo, TorrentListInfo
 
 bot = telebot.TeleBot(config.TOKEN)
 apiclient = UTorrentAPI(config.URL, config.USER, config.PASSWORD)

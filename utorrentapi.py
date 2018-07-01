@@ -1,6 +1,4 @@
 import requests
-import base64
-import json
 from lxml import html
 
 class StatusInfo:
