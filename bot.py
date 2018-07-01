@@ -83,6 +83,7 @@ def parse_dirs(filename):
                    "SORT_MOVIES": SORT_MOVIES }
     return parsed_dirs
 
+
 def list_torrents(chat_id):
     message = ""
     tor_list_text = []
