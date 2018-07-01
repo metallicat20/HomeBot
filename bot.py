@@ -19,7 +19,11 @@ def parse_commands(message):
     else:
         message_text = message.text
         if message_text == ("/list"):
-            list_torrents(chat_id)
+            message = list_torrents(chat_id)
+            if message == "":
+                bot.send_message(chat_id, "No torrents in progress")
+            else:
+                bot.send_message(chat_id, message)
         elif message_text.startswith("/magnet"):
             try:
                 start_torrent_from_magnet(message_text.split()[1], chat_id)
@@ -80,13 +84,15 @@ def parse_dirs(filename):
     return parsed_dirs
 
 def list_torrents(chat_id):
+    message = ""
     tor_list_text = []
     data = apiclient.get_list()
     tor_list = TorrentListInfo(data)
     message = ""
     for tor in tor_list.torrents:
         message+=(tor.name + " - " + str(tor.percent_progress/10) + "%\n\n")
-    bot.send_message(chat_id, message)
+    return message
+
 
 
 def name_from_magnet(magnet):
@@ -95,7 +101,6 @@ def name_from_magnet(magnet):
         if x.startswith("dn="):
             filename = x[3:]
     if is_series(filename):
-        print("This is series")
         filename_list = filename.split('.')
         if filename_list[0].lower() == "the":
             return [filename,filename_list[1]]
