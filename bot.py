@@ -108,7 +108,7 @@ def name_from_magnet(magnet):
         else:
             return [filename,filename_list[0]]
     else:
-        return [filename,None]
+        return [filename,filename]
 
 def is_series(filename):
     capitals = re.compile("S\d\dE\d\d")

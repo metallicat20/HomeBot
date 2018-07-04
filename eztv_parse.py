@@ -14,7 +14,7 @@ apiclient = UTorrentAPI(URL, USER, PASSWORD)
 def find_candidate_episodes_for_show(show):
     episodes = []
     for entry in feed.entries:
-        if show.lower() in entry.title.lower():
+        if show.lower().replace("'","") in entry.title.lower().replace("'",""):
             episodes.append(entry)
     return episodes
 
