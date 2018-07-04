@@ -43,6 +43,7 @@ class TorrentInfo:
         self.availability = data[16] # int in 1/65535
         self.torrent_queue_order = data[17]
         self.remaining = data[18] # in bytes
+        self.target = data[26] # folder or file
 
 class LabelInfo:
     def __init__(self, data):

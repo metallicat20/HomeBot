@@ -4,6 +4,10 @@ import re
 from kodi import update_library, clean_library
 from screenshot import get_screenshot
 from utorrentapi import UTorrentAPI, TorrentInfo, TorrentListInfo
+from os.path import isfile, isdir
+from os import stat, mkdir
+from distutils.dir_util import copy_tree
+from shutil import copyfile
 
 bot = telebot.TeleBot(config.TOKEN)
 apiclient = UTorrentAPI(config.URL, config.USER, config.PASSWORD)
@@ -89,7 +93,6 @@ def list_torrents(chat_id):
     tor_list_text = []
     data = apiclient.get_list()
     tor_list = TorrentListInfo(data)
-    message = ""
     for tor in tor_list.torrents:
         message+=(tor.name + " - " + str(tor.percent_progress/10) + "%\n\n")
     return message
@@ -118,6 +121,36 @@ def is_series(filename):
     else:
         return False
 
+
+def _create_list_of_movie_tors():
+    data = apiclient.get_list()
+    tor_list = TorrentListInfo(data)
+    movies = []
+    for tor in tor_list.torrents:
+        if config.MOVIES_FOLDER in tor.target:
+            movies.append(tor)
+    return movies
+
+
+def _is_folder(target):
+    if isdir(target):
+        return True
+    elif isfile(target):
+        return False
+
+
+def copy_movies():
+    for movie in _create_list_of_movie_tors():
+        dir_name = input("Name the directory for '%s':\n" % (movie.target.split('\\')[-1]))
+        full_path = "//".join([config.MOVIES_FOLDER, dir_name])
+        try:
+            stat(full_path)
+        except:
+            mkdir(full_path)
+        if _is_folder(movie.target):
+            copy_tree(movie.target, full_path)
+        else:
+            copyfile(movie.target, full_path)
 
 if __name__ == '__main__':
     bot.polling(none_stop=True)
