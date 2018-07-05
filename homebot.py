@@ -5,7 +5,7 @@ from kodi import update_library, clean_library
 from screenshot import get_screenshot
 from utorrentapi import UTorrentAPI, TorrentInfo, TorrentListInfo
 from os.path import isfile, isdir
-from os import stat, mkdir
+from os import stat, mkdir, remove
 from distutils.dir_util import copy_tree
 from shutil import copyfile
 from imdb import IMDb
@@ -52,6 +52,7 @@ def parse_commands(message):
         elif message_text == "/screenshot":
             sct = get_screenshot()
             bot.send_photo(chat_id, open(sct, 'rb'))
+            remove("monitor-1.png")
         elif message_text == "/copy_movies":
             copy_movies()
         elif message_text == "/purge_all_torrents":
