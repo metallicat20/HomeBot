@@ -2,7 +2,7 @@ import feedparser
 import re
 from os import listdir
 from os.path import isfile, isdir, join
-from bot import parse_dirs
+from homebot import parse_dirs
 from utorrentapi import UTorrentAPI
 from config import *
 
