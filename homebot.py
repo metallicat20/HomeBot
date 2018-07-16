@@ -9,6 +9,8 @@ from os import stat, mkdir, remove
 from distutils.dir_util import copy_tree
 from shutil import copyfile
 from imdb import IMDb
+from eztv_parse import *
+from sys import exc_info
 
 bot = telebot.TeleBot(config.TOKEN)
 apiclient = UTorrentAPI(config.URL, config.USER, config.PASSWORD)
@@ -26,8 +28,8 @@ def parse_commands(message):
         print(sender_id,sender_username)
     else:
         message_text = message.text
-        if message_text == ("/list"):
-            message = list_torrents(chat_id)
+        if message_text == "/list":
+            message = list_torrents()
             if message == "":
                 bot.send_message(chat_id, "No torrents in progress")
             else:
@@ -57,6 +59,14 @@ def parse_commands(message):
             copy_movies()
         elif message_text == "/purge_all_torrents":
             purge_all_torrents()
+        elif message_text == "/parse_eztv":
+            parse_eztv()
+        elif message_text == "/stop_all_torrents":
+            stop_all_torrents()
+            send_message("All torrents stopped")
+        elif message_text == "/remove_all_torrents":
+            remove_all_torrents()
+            send_message("All torrents removed")
 
 
 def send_message(message):
@@ -64,7 +74,7 @@ def send_message(message):
 
 
 def start_torrent_from_magnet(magnet, chat_id):
-    filename,short_filename = name_from_magnet(magnet)
+    filename, short_filename = name_from_magnet(magnet)
     parsed_dirs = parse_dirs(short_filename)
     if is_series(filename):
         if parsed_dirs['found']:
@@ -74,44 +84,45 @@ def start_torrent_from_magnet(magnet, chat_id):
     else:
         chosen_dir = parsed_dirs['SORT_MOVIES']
     result = apiclient.add_url_to_dir(magnet, chosen_dir)
-    if result == []:
+    if not result:
         bot.send_message(chat_id, "Failed to add, wrong magnet link?")
     elif result['build']:
-        bot.send_message(chat_id, "Downloading to %s" % (apiclient._get_dirs()[chosen_dir]))
+        bot.send_message(chat_id, "Downloading to %s" % (apiclient.get_dirs()[chosen_dir]))
     else:
         bot.send_message(chat_id, "Unknown error")
 
 
 def parse_dirs(filename):
+    sort_series, sort_movies = None, None
     found = False
     chosen_dir = None
-    dirs = apiclient._get_dirs()
-    for index, dir in enumerate(dirs):
-        if filename in dir:
+    dirs = apiclient.get_dirs()
+    for index, path in enumerate(dirs):
+        if filename in path:
             chosen_dir = index
             found = True
-        elif "#SORT_SERIES" in dir:
-            SORT_SERIES = index
-        elif "#SORT_MOVIES" in dir:
-            SORT_MOVIES = index
-    parsed_dirs = { "found": found,
+        elif "#SORT_SERIES" in path:
+            sort_series = index
+        elif "#SORT_MOVIES" in path:
+            sort_movies = index
+    parsed_dirs = {"found": found,
                    "chosen_dir": chosen_dir,
-                   "SORT_SERIES": SORT_SERIES,
-                   "SORT_MOVIES": SORT_MOVIES }
+                   "SORT_SERIES": sort_series,
+                   "SORT_MOVIES": sort_movies}
     return parsed_dirs
 
 
-def list_torrents(chat_id):
+def list_torrents():
     message = ""
-    tor_list_text = []
     data = apiclient.get_list()
     tor_list = TorrentListInfo(data)
     for tor in tor_list.torrents:
-        message+=(tor.name + " - " + str(tor.percent_progress/10) + "%\n\n")
+        message += (tor.name + " - " + str(tor.percent_progress/10) + "%\n\n")
     return message
 
 
 def name_from_magnet(magnet):
+    filename = None
     magnet_split = magnet.split("&")
     for x in magnet_split:
         if x.startswith("dn="):
@@ -119,11 +130,12 @@ def name_from_magnet(magnet):
     if is_series(filename):
         filename_list = filename.split('.')
         if filename_list[0].lower() == "the":
-            return [filename,filename_list[1]]
+            return [filename, filename_list[1]]
         else:
-            return [filename,filename_list[0]]
+            return [filename, filename_list[0]]
     else:
-        return [filename,filename]
+        return [filename, filename]
+
 
 def is_series(filename):
     capitals = re.compile("S\d\dE\d\d")
@@ -154,13 +166,13 @@ def _is_folder(target):
 def search_imdb(movie):
     try:
         movie = ia.search_movie(movie)[0]
-    except:
+    except IndexError:
         return [None, None, None]
     ia.update(movie)
     genres = movie['genres']
     if 'Documentary' in genres and 'Comedy' in genres:
         genre = 'standup'
-        year =  str(movie['year'])
+        year = str(movie['year'])
     else:
         genre = 'movie'
         year = None
@@ -170,7 +182,7 @@ def search_imdb(movie):
 def create_dir(full_path):
     try:
         stat(full_path)
-    except:
+    except FileNotFoundError:
         mkdir(full_path)
 
 
@@ -187,7 +199,7 @@ def copy_movies():
     for movie in movie_list:
         movie_name = normalize_movie_name(movie.name)
         print(movie_name)
-        send_message("Trying to process %s" % (movie.name))
+        send_message("Trying to process %s" % movie.name)
         dir_name, genre, year = search_imdb(movie_name)
         if not dir_name:
             send_message("Could not find this movie in IMDb")
@@ -216,5 +228,46 @@ def purge_all_torrents():
         apiclient.removedata(torrent.hash)
 
 
+def stop_all_torrents():
+    torrents = apiclient.get_list()
+    tor_list = TorrentListInfo(torrents)
+    for torrent in tor_list.torrents:
+        apiclient.stop(torrent.hash)
+
+
+def remove_all_torrents():
+    torrents = apiclient.get_list()
+    tor_list = TorrentListInfo(torrents)
+    for torrent in tor_list.torrents:
+        apiclient.remove(torrent.hash)
+
+
+def parse_eztv():
+    send_message("Parsing..")
+    feed = get_feed()
+    candidates = get_all_candidates(feed, shows)
+    all_new_episodes = get_all_new_episodes(shows, candidates)
+    list_to_download = create_list_to_download(all_new_episodes)
+    if not list_to_download:
+        send_message("No new episodes found")
+    for episode in list_to_download:
+        parsed_dirs = parse_dirs(episode['show'])
+        if parsed_dirs['found']:
+            chosen_dir = parsed_dirs['chosen_dir']
+        else:
+            chosen_dir = parsed_dirs['SORT_SERIES']
+        result = apiclient.add_url_to_dir(episode['magnet'], chosen_dir)
+        if not result:
+            send_message("Failed to add %s, wrong magnet link?" % (episode['name']))
+        elif result['build']:
+            send_message("Downloading %s to %s" % (episode['name'], apiclient.get_dirs()[chosen_dir]))
+        else:
+            send_message("Unknown error while downloading %s" % (episode['name']))
+
+
 if __name__ == '__main__':
-    bot.polling(none_stop=True)
+    try:
+        bot.polling(none_stop=True)
+    except:
+        print(exc_info()[0])
+        pass

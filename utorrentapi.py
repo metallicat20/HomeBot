@@ -289,7 +289,7 @@ class UTorrentAPI(object):
 
         return response.status_code, response
 
-    def _get_dirs(self):
+    def get_dirs(self):
         action = "action=list-dirs"
         status, response = self._action(action)
 

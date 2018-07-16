@@ -6,12 +6,18 @@ from homebot import parse_dirs
 from utorrentapi import UTorrentAPI
 from config import *
 
+
+
 shows = [ item for item in listdir(SERIES_FOLDER) if isdir(join(SERIES_FOLDER, item)) ]
-feed = feedparser.parse("https://eztv.ag/ezrss.xml")
-apiclient = UTorrentAPI(URL, USER, PASSWORD)
+#apiclient = UTorrentAPI(URL, USER, PASSWORD)
 
 
-def find_candidate_episodes_for_show(show):
+def get_feed():
+    feed = feedparser.parse("https://eztv.ag/ezrss.xml")
+    return feed
+
+
+def find_candidate_episodes_for_show(feed, show):
     episodes = []
     for entry in feed.entries:
         if show.lower().replace("'","") in entry.title.lower().replace("'",""):
@@ -19,10 +25,10 @@ def find_candidate_episodes_for_show(show):
     return episodes
 
 
-def get_all_candidates(shows):
+def get_all_candidates(feed, shows):
     candidates = {}
     for show in shows:
-        candidates[show] = find_candidate_episodes_for_show(show)
+        candidates[show] = find_candidate_episodes_for_show(feed, show)
     return candidates
 
 
@@ -35,7 +41,10 @@ def get_season_from_filename(filename):
 def get_episode_from_filename(filename):
     pattern = re.compile("S\d\dE\d\d")
     m = re.search(pattern, filename)
-    return m.group(0)
+    try:
+        return m.group(0)
+    except AttributeError:
+        return None
 
 
 def path_to_season(series, show, season):
@@ -105,25 +114,3 @@ def create_list_to_download(all_new_episodes):
         for episode in all_new_episodes[show].keys():
             list_to_download.append(find_highest_quality(all_new_episodes[show][episode]))
     return list_to_download
-
-
-def main():
-    candidates = get_all_candidates(shows)
-    all_new_episodes = get_all_new_episodes(shows, candidates)
-    list_to_download = create_list_to_download(all_new_episodes)
-    for episode in list_to_download:
-        parsed_dirs = parse_dirs(episode['show'])
-        if parsed_dirs['found']:
-            chosen_dir = parsed_dirs['chosen_dir']
-        else:
-            chosen_dir = parsed_dirs['SORT_SERIES']
-        result = apiclient.add_url_to_dir(episode['magnet'], chosen_dir)
-        if result == []:
-            print("Failed to add %s, wrong magnet link?" % (episode['name']))
-        elif result['build']:
-            print("Downloading %s to %s" % (episode['name'],apiclient._get_dirs()[chosen_dir]))
-        else:
-            print("Unknown error while downloading %s" % (episode['name']))
-
-if __name__ == '__main__':
-    main()
